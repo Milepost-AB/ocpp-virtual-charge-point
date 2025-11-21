@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events";
 import * as util from "node:util";
 import { WebSocket } from "ws";
 
@@ -23,6 +24,9 @@ import {
 import { TransactionManager } from "./transactionManager";
 import { heartbeatOcppMessage } from "./v16/messages/heartbeat";
 
+const ADMIN_API_ENABLED =
+  process.env.ADMIN_API_ENABLED?.toLowerCase() === "true";
+
 interface VCPOptions {
   ocppVersion: OcppVersion;
   endpoint: string;
@@ -39,7 +43,7 @@ interface LogEntry {
   metadata: Record<string, unknown>;
 }
 
-export class VCP {
+export class VCP extends EventEmitter {
   private ws?: WebSocket;
   private messageHandler: OcppMessageHandler;
 
@@ -48,8 +52,9 @@ export class VCP {
   transactionManager = new TransactionManager();
 
   constructor(private vcpOptions: VCPOptions) {
+    super();
     this.messageHandler = resolveMessageHandler(vcpOptions.ocppVersion);
-    if (vcpOptions.adminPort) {
+    if (ADMIN_API_ENABLED && vcpOptions.adminPort) {
       const adminApi = new Hono();
       adminApi.post(
         "/execute",
@@ -70,6 +75,10 @@ export class VCP {
         fetch: adminApi.fetch,
         port: vcpOptions.adminPort,
       });
+    } else if (vcpOptions.adminPort) {
+      logger.info(
+        `Admin API disabled; skipping server startup on port ${vcpOptions.adminPort}`,
+      );
     }
   }
 

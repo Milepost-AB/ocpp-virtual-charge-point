@@ -26,14 +26,17 @@ export class TransactionManager {
     TransactionId,
     TransactionState & { meterValuesTimer: NodeJS.Timer }
   > = new Map();
+  private pendingConnectors = new Set<number>();
 
   canStartNewTransaction(connectorId: number) {
-    return !Array.from(this.transactions.values()).some(
+    const hasActiveTransaction = Array.from(this.transactions.values()).some(
       (transaction) => transaction.connectorId === connectorId,
     );
+    return !hasActiveTransaction && !this.pendingConnectors.has(connectorId);
   }
 
   startTransaction(vcp: VCP, startTransactionProps: StartTransactionProps) {
+    this.releaseConnector(startTransactionProps.connectorId);
     const meterValuesTimer = setInterval(() => {
       // biome-ignore lint/style/noNonNullAssertion: transaction must exist
       const currentTransactionState = this.transactions.get(
@@ -63,6 +66,18 @@ export class TransactionManager {
       clearInterval(transaction.meterValuesTimer);
     }
     this.transactions.delete(transactionId);
+  }
+
+  reserveConnector(connectorId: number) {
+    if (!this.canStartNewTransaction(connectorId)) {
+      return false;
+    }
+    this.pendingConnectors.add(connectorId);
+    return true;
+  }
+
+  releaseConnector(connectorId: number) {
+    this.pendingConnectors.delete(connectorId);
   }
 
   getMeterValue(transactionId: TransactionId) {

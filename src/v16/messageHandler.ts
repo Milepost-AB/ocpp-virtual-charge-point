@@ -48,6 +48,7 @@ import {
   signedUpdateFirmwareOutgoingOcppMessage,
 } from "./messages/signedUpdateFirmware";
 import { startTransactionOcppMessage } from "./messages/startTransaction";
+import { startTransactionIncomingOcppMessage } from "./messages/startTransactionIncoming";
 import { statusNotificationOcppMessage } from "./messages/statusNotification";
 import { stopTransactionOcppMessage } from "./messages/stopTransaction";
 import { triggerMessageOcppMessage } from "./messages/triggerMessage";
@@ -75,6 +76,7 @@ export const ocppIncomingMessages: {
   GetLog: getLogOcppMessage,
   InstallCertificate: installCertificateOcppMessage,
   RemoteStartTransaction: remoteStartTransactionOcppMessage,
+  StartTransaction: startTransactionIncomingOcppMessage,
   RemoteStopTransaction: remoteStopTransactionOcppMessage,
   ReserveNow: reserveNowOcppMessage,
   Reset: resetOcppMessage,

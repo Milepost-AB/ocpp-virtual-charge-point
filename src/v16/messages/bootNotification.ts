@@ -32,10 +32,11 @@ class BootNotificationOcppMessage extends OcppOutgoing<
 > {
   resHandler = async (
     vcp: VCP,
-    _call: OcppCall<z.infer<BootNotificationReqType>>,
+    call: OcppCall<z.infer<BootNotificationReqType>>,
     result: OcppCallResult<z.infer<BootNotificationResType>>,
   ): Promise<void> => {
     vcp.configureHeartbeat(result.payload.interval * 1000);
+    vcp.emit("BootNotificationAccepted", { call, result });
   };
 }
 
