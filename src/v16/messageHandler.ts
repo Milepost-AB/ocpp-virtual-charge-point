@@ -50,6 +50,7 @@ import {
 import { startTransactionOcppMessage } from "./messages/startTransaction";
 import { startTransactionIncomingOcppMessage } from "./messages/startTransactionIncoming";
 import { statusNotificationOcppMessage } from "./messages/statusNotification";
+import { stopTransactionIncomingOcppMessage } from "./messages/stopTransactionIncoming";
 import { stopTransactionOcppMessage } from "./messages/stopTransaction";
 import { triggerMessageOcppMessage } from "./messages/triggerMessage";
 import { unlockConnectorOcppMessage } from "./messages/unlockConnector";
@@ -78,6 +79,7 @@ export const ocppIncomingMessages: {
   RemoteStartTransaction: remoteStartTransactionOcppMessage,
   StartTransaction: startTransactionIncomingOcppMessage,
   RemoteStopTransaction: remoteStopTransactionOcppMessage,
+  StopTransaction: stopTransactionIncomingOcppMessage,
   ReserveNow: reserveNowOcppMessage,
   Reset: resetOcppMessage,
   SendLocalList: sendLocalListOcppMessage,

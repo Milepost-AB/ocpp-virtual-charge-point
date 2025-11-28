@@ -7,7 +7,7 @@ import {
 import type { VCP } from "../../vcp";
 import { IdTagInfoSchema, IdTokenSchema, MeterValueSchema } from "./_common";
 
-const StopTransactionReqSchema = z.object({
+export const StopTransactionReqSchema = z.object({
   idTag: IdTokenSchema.nullish(),
   meterStop: z.number().int(),
   timestamp: z.string().datetime(),
@@ -31,7 +31,7 @@ const StopTransactionReqSchema = z.object({
 });
 type StopTransactionReqType = typeof StopTransactionReqSchema;
 
-const StopTransactionResSchema = z.object({
+export const StopTransactionResSchema = z.object({
   idTagInfo: IdTagInfoSchema.nullish(),
 });
 type StopTransactionResType = typeof StopTransactionResSchema;

@@ -80,6 +80,12 @@ export class TransactionManager {
     this.pendingConnectors.delete(connectorId);
   }
 
+  releaseAllConnectors() {
+    const connectors = Array.from(this.pendingConnectors);
+    this.pendingConnectors.clear();
+    return connectors;
+  }
+
   getMeterValue(transactionId: TransactionId) {
     const transaction = this.transactions.get(transactionId);
     if (!transaction) {

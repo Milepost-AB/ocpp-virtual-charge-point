@@ -25,52 +25,66 @@ class RemoteStopTransactionOcppMessage extends OcppIncoming<
   ): Promise<void> => {
     const transactionId = call.payload.transactionId;
     const transaction = vcp.transactionManager.transactions.get(transactionId);
-    if (!transaction) {
-      vcp.respond(this.response(call, { status: "Rejected" }));
-      return;
-    }
+    const connectorsToUpdate = new Set<number>();
     vcp.respond(this.response(call, { status: "Accepted" }));
 
-    const ocmf = generateOCMF({
-      startTime: transaction.startedAt,
-      startEnergy: 0,
-      endTime: new Date(),
-      endEnergy: vcp.transactionManager.getMeterValue(transactionId) / 1000,
-      idTag: transaction.idTag,
-    });
+    const meterStopValue = Math.floor(
+      transaction ? vcp.transactionManager.getMeterValue(transactionId) : 0,
+    );
+
+    let transactionData;
+    if (transaction) {
+      connectorsToUpdate.add(transaction.connectorId);
+      const ocmf = generateOCMF({
+        startTime: transaction.startedAt,
+        startEnergy: 0,
+        endTime: new Date(),
+        endEnergy: vcp.transactionManager.getMeterValue(transactionId) / 1000,
+        idTag: transaction.idTag,
+      });
+
+      vcp.transactionManager.stopTransaction(transactionId);
+
+      transactionData = [
+        {
+          timestamp: new Date().toISOString(),
+          sampledValue: [
+            {
+              value: JSON.stringify({
+                signedMeterData: Buffer.from(ocmf).toString("base64"),
+                encodingMethod: "OCMF",
+                publicKey: getOCMFPublicKey().toString("base64"),
+              }),
+              format: "SignedData",
+              context: "Transaction.End",
+            },
+          ],
+        },
+      ];
+    }
 
     vcp.send(
       stopTransactionOcppMessage.request({
         transactionId: transactionId,
-        meterStop: Math.floor(
-          vcp.transactionManager.getMeterValue(transactionId),
-        ),
+        meterStop: meterStopValue,
         timestamp: new Date().toISOString(),
-        transactionData: [
-          {
-            timestamp: new Date().toISOString(),
-            sampledValue: [
-              {
-                value: JSON.stringify({
-                  signedMeterData: Buffer.from(ocmf).toString("base64"),
-                  encodingMethod: "OCMF",
-                  publicKey: getOCMFPublicKey().toString("base64"),
-                }),
-                format: "SignedData",
-                context: "Transaction.End",
-              },
-            ],
-          },
-        ],
+        transactionData,
       }),
     );
-    vcp.send(
-      statusNotificationOcppMessage.request({
-        connectorId: transaction.connectorId,
-        errorCode: "NoError",
-        status: "Available",
-      }),
+
+    vcp.transactionManager.releaseAllConnectors().forEach((connectorId) =>
+      connectorsToUpdate.add(connectorId),
     );
+
+    connectorsToUpdate.forEach((connectorId) => {
+      vcp.send(
+        statusNotificationOcppMessage.request({
+          connectorId,
+          errorCode: "NoError",
+          status: "Available",
+        }),
+      );
+    });
   };
 }
 
