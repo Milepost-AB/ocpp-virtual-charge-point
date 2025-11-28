@@ -6,51 +6,93 @@ Simple, configurable, terminal-based OCPP Charging Station simulator written in 
 
 [![VCP Video](https://img.youtube.com/vi/YsXjnk0mhfA/0.jpg)](https://www.youtube.com/watch?v=YsXjnk0mhfA)
 
-## Prerequisites
+## Getting started
 
-- Node.js 12+
+1. Install dependencies
 
-Run:
+   ```bash
+   npm install
+   ```
+
+2. Configure virtual charge points
+
+   The runtime looks for `config/vcps.json` (or a file pointed to by `VCP_CONFIG_FILE`).  
+   Use the provided sample as a starting point:
+
+   ```bash
+   cp config/vcps.example.json config/vcps.json
+   ```
+
+   Each file contains:
+
+   ```json
+   {
+     "admin": { "port": 9999 },
+     "defaults": {
+       "endpoint": "ws://localhost:8092",
+       "basicAuthPassword": "secret"
+     },
+     "vcps": [
+       {
+         "id": "CP-001",
+         "ocppVersion": "OCPP_1.6",
+         "endpoint": "ws://central-system:3000",
+         "chargePointSerialNumber": "CP-001-S001",
+         "autoBoot": {
+           "enabled": true,
+           "chargePointVendor": "Solidstudio",
+           "chargePointModel": "VirtualChargePoint",
+           "firmwareVersion": "1.0.0",
+           "connectorsPerChargePoint": 2
+         },
+         "metadata": {
+           "site": "HQ"
+         }
+       }
+     ]
+   }
+   ```
+
+   - `admin.port` determines where the shared Admin API is exposed.
+   - `defaults` seed properties for every VCP when omitted per entry.
+   - Each object in `vcps` creates one managed `VCP` instance (with its own `chargePointId`, OCPP version, credentials, and auto-boot behaviour).
+
+3. (Optional) Environment fallback
+
+   If the config file is missing we fall back to the previous env-based behaviour.  
+   The following variables are honoured:
+
+   | Variable | Description |
+   | --- | --- |
+   | `WS_URL` | Central system websocket URL |
+   | `CP_IDS` / `CP_ID` | Comma separated list (or single id) of charge point ids |
+   | `PASSWORD` | Basic auth password |
+   | `OCPP_VERSION` | `OCPP_1.6`, `OCPP_2.0.1`, or `OCPP_2.1` |
+   | `FIRMWARE_VERSION`, `CHARGE_POINT_VENDOR`, `CHARGE_POINT_MODEL` | Boot metadata |
+   | `CONNECTORS_PER_CP` | Number of connectors per charge point |
+   | `ADMIN_PORT` / `ADMIN_WS_PORT` | Admin API port |
+
+## Run the unified entrypoint
 
 ```bash
-npm install
+npm run start
 ```
 
-## Running VCP
-
-Configure env variables:
-
-```
-WS_URL - websocket endpoint
-CP_ID - ID of this VCP
-PASSWORD - if used for OCPP Authentication, otherwise can be left blank
-```
-
-Run OCPP 1.6:
+or run directly with tsx:
 
 ```bash
-npx tsx index_16.ts
+VCP_CONFIG_FILE=./config/my-vcps.json npx tsx src/main.ts
 ```
 
-Run OCPP 2.0.1:
+The process boots every configured VCP, automatically sends Boot/Status notifications (when `autoBoot.enabled` is true), and starts the shared Admin API server.
+
+## Example log output
 
 ```bash
-npx tsx index_201.ts
-```
-
-When testing different configurations, you can create multiple `.env` files and pass the env file as an argument, for example:
-
-```bash
-npm start -- --env-file=.env index_16.ts
-```
-
-## Example
-
-```bash
-> WS_URL=ws://localhost:3000 CP_ID=vcp_16_test npx tsx index_16.ts
+> WS_URL=ws://localhost:8092 CP_ID=vcp_16_test npx tsx src/main.ts
 
 2023-03-27 13:09:17 info: Connecting... | {
-  endpoint: 'ws://localhost:3000',
+  endpoint: 'ws://localhost:8092',
   chargePointId: 'vcp_16_test',
   ocppVersion: 'OCPP_1.6',
   basicAuthPassword: 'password',
@@ -70,16 +112,37 @@ npm start -- --env-file=.env index_16.ts
 2023-03-27 13:10:17 info: Receive message ⬅️  [3,"79a41b2e-2c4a-4a65-9d7e-417967a8f95f",{"currentTime":"2023-03-27T11:10:17.955Z"}]
 ```
 
-## Executing Admin Commands
+## Admin API
 
-Some messages are automatically sent by the VCP, for example, `BootNotification` or `StartTransaction` and `StopTransaction`.
-However, for Operations initiated by Charge Point (compare e.g. with OCPP 1.6, Chapter 4) one can send the messages using `admin` functionality.
-VCP exposes a separate Websocket endpoint that will "proxy" all messages to Central System Websocket.
-For example usage, see `admin/` folder.
+The new Admin API exposes a single HTTP server (default `http://localhost:9999`) with JSON endpoints:
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/health` | Basic readiness probe |
+| `GET` | `/vcp` | List all managed VCPs with their current status |
+| `GET` | `/vcp/:id` | Inspect a single VCP |
+| `POST` | `/vcp` | Create a new VCP (body mirrors the config format) |
+| `PATCH` | `/vcp/:id` | Update metadata, credentials, or autoBoot settings |
+| `POST` | `/vcp/:id/connect` | Connect (or reconnect) a VCP |
+| `POST` | `/vcp/:id/stop` | Gracefully stop/close a VCP session |
+| `POST` | `/vcp/:id/action` | Proxy an arbitrary OCPP action + payload |
+| `DELETE` | `/vcp/:id` | Stop and remove a VCP from the manager |
+
+Example – list all VCPs:
 
 ```bash
-npx tsx admin/v16/Authorize/authorize.ts
+curl http://localhost:9999/vcp | jq
 ```
+
+Example – trigger a RemoteStartTransaction action:
+
+```bash
+curl -X POST http://localhost:9999/vcp/CP-001/action \
+  -H "Content-Type: application/json" \
+  -d '{"action":"RemoteStartTransaction","payload":{"connectorId":1,"idTag":"ABC123"}}'
+```
+
+You can wire any UI or script against this API without spinning extra admin servers inside each VCP instance.
 
 ---
 

@@ -1,0 +1,29 @@
+{
+  "admin": {
+    "port": 9999
+  },
+  "defaults": {
+    "endpoint": "ws://localhost:8092",
+    "basicAuthPassword": "secret"
+  },
+  "vcps": [
+    {
+      "id": "CP-001",
+      "ocppVersion": "OCPP_1.6",
+      "endpoint": "ws://ocpp-hub:3000",
+      "chargePointSerialNumber": "CP-001-S001",
+      "autoBoot": {
+        "enabled": true,
+        "chargePointVendor": "Solidstudio",
+        "chargePointModel": "VirtualChargePoint",
+        "firmwareVersion": "1.0.0",
+        "connectorsPerChargePoint": 2
+      },
+      "metadata": {
+        "site": "HQ",
+        "notes": "Example configuration entry"
+      }
+    }
+  ]
+}
+

@@ -24,7 +24,7 @@ interface StartTransactionProps {
 export class TransactionManager {
   transactions: Map<
     TransactionId,
-    TransactionState & { meterValuesTimer: NodeJS.Timer }
+    TransactionState & { meterValuesTimer: NodeJS.Timeout }
   > = new Map();
   private pendingConnectors = new Set<number>();
 
@@ -56,7 +56,7 @@ export class TransactionManager {
       startedAt: new Date(),
       evseId: startTransactionProps.evseId,
       connectorId: startTransactionProps.connectorId,
-      meterValuesTimer: meterValuesTimer,
+      meterValuesTimer,
     });
   }
 

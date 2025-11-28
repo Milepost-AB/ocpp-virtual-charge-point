@@ -5,6 +5,7 @@ import { statusNotificationOcppMessage } from "./statusNotification";
 import {
   StopTransactionReqSchema,
   StopTransactionResSchema,
+  stopTransactionOcppMessage,
 } from "./stopTransaction";
 
 class StopTransactionIncomingOcppMessage extends OcppIncoming<

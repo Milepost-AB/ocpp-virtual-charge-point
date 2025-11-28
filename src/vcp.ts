@@ -2,12 +2,7 @@ import { EventEmitter } from "node:events";
 import * as util from "node:util";
 import { WebSocket } from "ws";
 
-import { serve } from "@hono/node-server";
-import { zValidator } from "@hono/zod-validator";
-import { Hono } from "hono";
-import { z } from "zod";
 import { logger } from "./logger";
-import { call } from "./messageFactory";
 import type { OcppCall, OcppCallError, OcppCallResult } from "./ocppMessage";
 import {
   type OcppMessageHandler,
@@ -24,15 +19,11 @@ import {
 import { TransactionManager } from "./transactionManager";
 import { heartbeatOcppMessage } from "./v16/messages/heartbeat";
 
-const ADMIN_API_ENABLED =
-  process.env.ADMIN_API_ENABLED?.toLowerCase() === "true";
-
 interface VCPOptions {
   ocppVersion: OcppVersion;
   endpoint: string;
   chargePointId: string;
   basicAuthPassword?: string;
-  adminPort?: number;
 }
 
 interface LogEntry {
@@ -48,44 +39,26 @@ export class VCP extends EventEmitter {
   private messageHandler: OcppMessageHandler;
 
   private isFinishing = false;
+  private heartbeatInterval?: NodeJS.Timeout;
+  private connectionPromise?: Promise<void>;
 
   transactionManager = new TransactionManager();
 
   constructor(private vcpOptions: VCPOptions) {
     super();
     this.messageHandler = resolveMessageHandler(vcpOptions.ocppVersion);
-    if (ADMIN_API_ENABLED && vcpOptions.adminPort) {
-      const adminApi = new Hono();
-      adminApi.post(
-        "/execute",
-        zValidator(
-          "json",
-          z.object({
-            action: z.string(),
-            payload: z.any(),
-          }),
-        ),
-        (c) => {
-          const validated = c.req.valid("json");
-          this.send(call(validated.action, validated.payload));
-          return c.text("OK");
-        },
-      );
-      serve({
-        fetch: adminApi.fetch,
-        port: vcpOptions.adminPort,
-      });
-    } else if (vcpOptions.adminPort) {
-      logger.info(
-        `Admin API disabled; skipping server startup on port ${vcpOptions.adminPort}`,
-      );
-    }
   }
 
   async connect(): Promise<void> {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      return;
+    }
+    if (this.connectionPromise) {
+      return this.connectionPromise;
+    }
     logger.info(`Connecting... | ${util.inspect(this.vcpOptions)}`);
     this.isFinishing = false;
-    return new Promise((resolve) => {
+    this.connectionPromise = new Promise((resolve, reject) => {
       const websocketUrl = `${this.vcpOptions.endpoint}/${this.vcpOptions.chargePointId}`;
       const protocol = toProtocolVersion(this.vcpOptions.ocppVersion);
       this.ws = new WebSocket(websocketUrl, [protocol], {
@@ -100,7 +73,14 @@ export class VCP extends EventEmitter {
         },
       });
 
-      this.ws.on("open", () => resolve());
+      this.ws.on("open", () => {
+        logger.info(
+          `WebSocket open | id=${this.vcpOptions.chargePointId} version=${this.vcpOptions.ocppVersion}`,
+        );
+        this.emit("connected");
+        this.connectionPromise = undefined;
+        resolve();
+      });
       this.ws.on("message", (message: string) => this._onMessage(message));
       this.ws.on("ping", () => {
         logger.info("Received PING");
@@ -111,7 +91,16 @@ export class VCP extends EventEmitter {
       this.ws.on("close", (code: number, reason: string) =>
         this._onClose(code, reason),
       );
+      this.ws.on("error", (error) => {
+        logger.error(
+          `WebSocket error | id=${this.vcpOptions.chargePointId}`,
+          error,
+        );
+        this.connectionPromise = undefined;
+        reject(error);
+      });
     });
+    return this.connectionPromise;
   }
 
   // biome-ignore lint/suspicious/noExplicitAny: ocpp types
@@ -167,21 +156,25 @@ export class VCP extends EventEmitter {
   }
 
   configureHeartbeat(interval: number) {
-    setInterval(() => {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+    }
+    this.heartbeatInterval = setInterval(() => {
       this.send(heartbeatOcppMessage.request({}));
     }, interval);
   }
 
   close() {
     if (!this.ws) {
-      throw new Error(
-        "Trying to close a Websocket that was not opened. Call connect() first",
+      logger.warn(
+        `close() called while websocket not initialized | id=${this.vcpOptions.chargePointId}`,
       );
+      return;
     }
     this.isFinishing = true;
+    this.clearHeartbeat();
     this.ws.close();
     this.ws = undefined;
-    process.exit(1);
   }
 
   async getDiagnosticData(): Promise<LogEntry[]> {
@@ -267,10 +260,21 @@ export class VCP extends EventEmitter {
   }
 
   private _onClose(code: number, reason: string) {
+    this.clearHeartbeat();
+    this.ws = undefined;
+    this.connectionPromise = undefined;
     if (this.isFinishing) {
+      this.emit("disconnected", { code, reason, expected: true });
       return;
     }
     logger.info(`Connection closed. code=${code}, reason=${reason}`);
-    process.exit();
+    this.emit("disconnected", { code, reason, expected: false });
+  }
+
+  private clearHeartbeat() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = undefined;
+    }
   }
 }

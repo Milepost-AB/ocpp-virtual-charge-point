@@ -2,8 +2,9 @@ import { z } from "zod";
 import { generateOCMF, getOCMFPublicKey } from "../../ocmfGenerator";
 import { type OcppCall, OcppIncoming } from "../../ocppMessage";
 import type { VCP } from "../../vcp";
+import { MeterValueSchema } from "./_common";
 import { statusNotificationOcppMessage } from "./statusNotification";
-import { stopTransactionOcppMessage } from "./stopTransaction";
+import { stopTransactionOcppMessage, StopTransactionReqSchema } from "./stopTransaction";
 
 const RemoteStopTransactionReqSchema = z.object({
   transactionId: z.number().int(),
@@ -32,7 +33,9 @@ class RemoteStopTransactionOcppMessage extends OcppIncoming<
       transaction ? vcp.transactionManager.getMeterValue(transactionId) : 0,
     );
 
-    let transactionData;
+    let transactionData:
+      | z.infer<typeof StopTransactionReqSchema>["transactionData"]
+      | undefined;
     if (transaction) {
       connectorsToUpdate.add(transaction.connectorId);
       const ocmf = generateOCMF({
@@ -45,20 +48,22 @@ class RemoteStopTransactionOcppMessage extends OcppIncoming<
 
       vcp.transactionManager.stopTransaction(transactionId);
 
+      const sampledValue: z.infer<typeof MeterValueSchema>["sampledValue"] = [
+        {
+          value: JSON.stringify({
+            signedMeterData: Buffer.from(ocmf).toString("base64"),
+            encodingMethod: "OCMF",
+            publicKey: getOCMFPublicKey().toString("base64"),
+          }),
+          format: "SignedData",
+          context: "Transaction.End",
+        },
+      ];
+
       transactionData = [
         {
           timestamp: new Date().toISOString(),
-          sampledValue: [
-            {
-              value: JSON.stringify({
-                signedMeterData: Buffer.from(ocmf).toString("base64"),
-                encodingMethod: "OCMF",
-                publicKey: getOCMFPublicKey().toString("base64"),
-              }),
-              format: "SignedData",
-              context: "Transaction.End",
-            },
-          ],
+          sampledValue,
         },
       ];
     }
