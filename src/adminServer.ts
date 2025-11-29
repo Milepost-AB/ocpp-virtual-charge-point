@@ -1,6 +1,10 @@
 import { serve } from "@hono/node-server";
+import { serveStatic } from "@hono/node-server/serve-static";
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import type { Context } from "hono";
 import type { StatusCode } from "hono/utils/http-status";
 import { z } from "zod";
@@ -13,6 +17,7 @@ import {
 import { logger } from "./logger";
 import { call } from "./messageFactory";
 import { OcppVersion } from "./ocppVersion";
+import { resolveOcppOutgoingMessage } from "./schemaValidator";
 import { type VcpManager, type VcpUpdateInput } from "./vcpManager";
 
 const bootPartialSchema = z.object({
@@ -99,6 +104,16 @@ const createUpdatePayload = (
 export const createAdminApp = (manager: VcpManager): Hono => {
   const app = new Hono();
 
+  app.use(
+    "*",
+    cors({
+      origin: (origin) => origin ?? "*",
+      allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+      allowHeaders: ["Content-Type", "Authorization"],
+      exposeHeaders: ["Content-Type"],
+    }),
+  );
+
   app.onError((err, c) => {
     logger.error("Admin API error", err);
     c.status(mapErrorStatus(err));
@@ -176,9 +191,32 @@ export const createAdminApp = (manager: VcpManager): Hono => {
     zValidator("json", actionSchema),
     async (c) => {
       const id = c.req.param("id");
+      const config = manager.getConfig(id);
+      if (!config) {
+        c.status(toStatusCode(404));
+        return c.json(respondNotFound(id));
+      }
       const body = c.req.valid("json");
       try {
-        await manager.sendAction(id, call(body.action, body.payload ?? {}));
+        const ocppMessage = resolveOcppOutgoingMessage(
+          config.ocppVersion,
+          body.action,
+        );
+
+        let payload = body.payload ?? {};
+        if (ocppMessage) {
+          const validationResult = ocppMessage.reqSchema.safeParse(payload);
+          if (!validationResult.success) {
+            c.status(toStatusCode(400));
+            return c.json({
+              error: "Invalid payload",
+              details: validationResult.error.issues,
+            });
+          }
+          payload = validationResult.data;
+        }
+
+        await manager.sendAction(id, call(body.action, payload));
         return c.json({ id, status: "queued" });
       } catch (error) {
         logger.error(`Failed to send action to VCP ${id}`, error);
@@ -200,6 +238,34 @@ export const createAdminApp = (manager: VcpManager): Hono => {
       return c.json({ error: (error as Error).message });
     }
   });
+
+  const adminUiDistPath = path.join(process.cwd(), "admin-ui", "dist");
+  if (existsSync(adminUiDistPath)) {
+    const staticHandler = serveStatic({
+      root: adminUiDistPath,
+    });
+    const spaHandler = serveStatic({
+      root: adminUiDistPath,
+      rewriteRequestPath: () => "/index.html",
+    });
+
+    app.get("/assets/*", staticHandler);
+    app.get("/favicon.ico", staticHandler);
+    app.get("/", spaHandler);
+    app.get("*", async (c, next) => {
+      if (
+        c.req.path.startsWith("/vcp") ||
+        c.req.path.startsWith("/health")
+      ) {
+        return next();
+      }
+      return spaHandler(c, next);
+    });
+  } else {
+    logger.warn(
+      `Admin UI bundle not found at ${adminUiDistPath}. Run "npm run admin-ui:build" to generate it.`,
+    );
+  }
 
   return app;
 };

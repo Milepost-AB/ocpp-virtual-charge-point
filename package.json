@@ -7,7 +7,9 @@
     "lint": "biome lint src",
     "format": "biome format src",
     "typecheck": "tsc --noEmit",
-    "check": "npm run lint && npm run format && npm run typecheck"
+    "check": "npm run lint && npm run format && npm run typecheck",
+    "admin-ui:dev": "cd admin-ui && npm run dev",
+    "admin-ui:build": "cd admin-ui && npm run build"
   },
   "author": "Solidstudio",
   "license": "Apache-2.0",

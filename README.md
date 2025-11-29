@@ -144,6 +144,19 @@ curl -X POST http://localhost:9999/vcp/CP-001/action \
 
 You can wire any UI or script against this API without spinning extra admin servers inside each VCP instance.
 
+## Admin UI (beta)
+
+Looking for a quick way to inspect VCPs and queue actions without `curl`?  
+Build the bundled React UI and let the Admin server host it:
+
+```bash
+npm run admin-ui:build
+npm start
+# visit http://localhost:9999/
+```
+
+Development, configuration, and architectural notes live in [ADMIN_UI.md](./ADMIN_UI.md).
+
 ---
 
 ## Contributing

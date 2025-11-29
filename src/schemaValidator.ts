@@ -1,4 +1,7 @@
+import type { z } from "zod";
+
 import { logger } from "./logger";
+import type { OcppOutgoing } from "./ocppMessage";
 import { OcppVersion } from "./ocppVersion";
 import {
   ocppIncomingMessages as ocppIncomingMessages16,
@@ -39,6 +42,14 @@ const getOcppOutgoingMessages = (ocppVersion: OcppVersion) => {
     default:
       throw new Error(`Ocpp messages not found for version: ${ocppVersion}`);
   }
+};
+
+export const resolveOcppOutgoingMessage = (
+  ocppVersion: OcppVersion,
+  action: string,
+): OcppOutgoing<z.ZodTypeAny, z.ZodTypeAny> | undefined => {
+  const ocppMessages = getOcppOutgoingMessages(ocppVersion);
+  return ocppMessages[action];
 };
 
 export const validateOcppIncomingRequest = (

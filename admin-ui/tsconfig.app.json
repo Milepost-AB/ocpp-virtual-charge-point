@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.node.json",
+  "compilerOptions": {
+    "composite": true,
+    "jsx": "react-jsx",
+    "moduleResolution": "bundler",
+    "types": ["vite/client"]
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.test.*"]
+}
+
