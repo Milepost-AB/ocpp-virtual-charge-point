@@ -15,6 +15,7 @@ const BOOT_CONFIG_DEFAULTS = {
   chargePointModel: "VirtualChargePoint",
   firmwareVersion: "1.0.0",
   connectorsPerChargePoint: 1,
+  connectors: undefined as number[] | undefined,
 } as const;
 
 const BootConfigSchema = z.object({
@@ -27,6 +28,7 @@ const BootConfigSchema = z.object({
     .int()
     .min(1)
     .default(BOOT_CONFIG_DEFAULTS.connectorsPerChargePoint),
+  connectors: z.array(z.number().int().positive()).optional(),
 });
 
 const AdminConfigSchema = z.object({
@@ -194,6 +196,7 @@ export const mergeBootConfig = (
       specific?.connectorsPerChargePoint ??
       defaults?.connectorsPerChargePoint ??
       1,
+    connectors: specific?.connectors ?? defaults?.connectors,
   };
 };
 

@@ -3,6 +3,7 @@ import {
   SUPPORTED_OCPP_VERSIONS,
   normalizeOcppVersion,
   type StartTransactionFormInput,
+  type StatusNotificationFormInput,
   type SupportedOcppVersion,
   type VcpSnapshot,
 } from "./types";
@@ -144,6 +145,36 @@ export const startTransaction = async (params: {
     body: JSON.stringify({
       action,
       payload,
+    }),
+  });
+  await handleResponse(response);
+};
+
+export const sendStatusNotification = async (params: {
+  vcp: VcpSnapshot;
+  form: StatusNotificationFormInput;
+}): Promise<void> => {
+  const normalizedVersion = normalizeOcppVersion(params.vcp.ocppVersion);
+  if (normalizedVersion !== "OCPP_1_6") {
+    throw new Error(
+      `StatusNotification is supported for OCPP_1.6 (this VCP is ${params.vcp.ocppVersion}).`,
+    );
+  }
+
+  const response = await fetch(apiUrl(`/vcp/${params.vcp.id}/action`), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      action: "StatusNotification",
+      payload: {
+        connectorId: params.form.connectorId,
+        status: params.form.status,
+        errorCode: params.form.errorCode,
+        timestamp: params.form.timestamp ?? new Date().toISOString(),
+        info: params.form.info || undefined,
+        vendorId: params.form.vendorId || undefined,
+        vendorErrorCode: params.form.vendorErrorCode || undefined,
+      },
     }),
   });
   await handleResponse(response);

@@ -9,6 +9,7 @@ import { formatDateTime } from "../../../lib/utils";
 import { connectVcp, stopVcp } from "../api";
 import type { VcpLifecycleStatus, VcpSnapshot } from "../types";
 import { StartTransactionDialog } from "./StartTransactionDialog";
+import { StatusNotificationDialog } from "./StatusNotificationDialog";
 
 interface VcpCardProps {
   vcp: VcpSnapshot;
@@ -150,6 +151,7 @@ export const VcpCard = ({ vcp, onRefresh }: VcpCardProps) => {
             Stop
           </Button>
           <StartTransactionDialog vcp={vcp} onSuccess={onRefresh} />
+          <StatusNotificationDialog vcp={vcp} onSuccess={onRefresh} />
         </div>
         <Button
           variant="ghost"

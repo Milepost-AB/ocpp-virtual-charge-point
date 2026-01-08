@@ -1,0 +1,63 @@
+{
+  "admin": {
+    "port": 9999
+  },
+  "defaults": {
+    "endpoint": "ws://localhost:8092",
+    "basicAuthPassword": "secret"
+  },
+  "vcps": [
+    {
+      "id": "cbd2940c-8c14-407e-acd0-561737eec9a7",
+      "ocppVersion": "OCPP_1.6",
+      "endpoint": "ws://localhost:8092",
+      "chargePointSerialNumber": "Milepost",
+      "autoBoot": {
+        "enabled": true,
+        "chargePointVendor": "Solidstudio",
+        "chargePointModel": "VirtualChargePoint",
+        "firmwareVersion": "1.0.0",
+        "connectors": [1, 2, 3, 4, 5]
+      },
+      "metadata": {
+        "site": "HQ",
+        "notes": "Example configuration entry"
+      }
+    },
+    {
+      "id": "33087076-097b-4584-bb40-f2516cf26a21",
+      "ocppVersion": "OCPP_1.6",
+      "endpoint": "ws://localhost:8092",
+      "chargePointSerialNumber": "Valhallavägen 1",
+      "autoBoot": {
+        "enabled": true,
+        "chargePointVendor": "Solidstudio",
+        "chargePointModel": "VirtualChargePoint",
+        "firmwareVersion": "1.0.0",
+        "connectors": [1, 2, 3, 4, 5]
+      },
+      "metadata": {
+        "site": "HQ",
+        "notes": "Example configuration entry"
+      }
+    },
+
+    {
+      "id": "2cbe7a01-2dab-4863-a2b7-370d72d6c168",
+      "ocppVersion": "OCPP_1.6",
+      "endpoint": "ws://localhost:8092",
+      "chargePointSerialNumber": "Valhallavägen 2",
+      "autoBoot": {
+        "enabled": true,
+        "chargePointVendor": "Solidstudio",
+        "chargePointModel": "VirtualChargePoint",
+        "firmwareVersion": "1.0.0",
+        "connectors": [1, 2, 3, 4, 5]
+      },
+      "metadata": {
+        "site": "HQ",
+        "notes": "Example configuration entry"
+      }
+    }
+  ]
+}
