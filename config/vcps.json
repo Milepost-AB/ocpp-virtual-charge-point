@@ -8,7 +8,7 @@
   },
   "vcps": [
     {
-      "id": "cbd2940c-8c14-407e-acd0-561737eec9a7",
+      "id": "ACE0079406",
       "ocppVersion": "OCPP_1.6",
       "endpoint": "ws://localhost:8092",
       "chargePointSerialNumber": "Milepost",

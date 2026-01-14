@@ -268,11 +268,7 @@ export class VcpManager {
       );
 
     sendStatus(0);
-    for (
-      let connectorId = 1;
-      connectorId <= autoBoot.connectorsPerChargePoint;
-      connectorId += 1
-    ) {
+    for (const connectorId of autoBoot.connectors) {
       sendStatus(connectorId);
     }
 
@@ -300,11 +296,7 @@ export class VcpManager {
     record.lastBootAcceptedAt = new Date();
 
     const timestamp = new Date().toISOString();
-    for (
-      let connector = 1;
-      connector <= autoBoot.connectorsPerChargePoint;
-      connector += 1
-    ) {
+    for (const connector of autoBoot.connectors) {
       record.instance.send(
         statusNotification201.request({
           connectorStatus: "Available",
@@ -339,11 +331,7 @@ export class VcpManager {
     record.lastBootAcceptedAt = new Date();
 
     const timestamp = new Date().toISOString();
-    for (
-      let connector = 1;
-      connector <= autoBoot.connectorsPerChargePoint;
-      connector += 1
-    ) {
+    for (const connector of autoBoot.connectors) {
       record.instance.send(
         statusNotification21.request({
           connectorStatus: "Available",

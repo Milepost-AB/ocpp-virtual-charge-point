@@ -25,7 +25,7 @@ const bootPartialSchema = z.object({
   chargePointVendor: z.string().optional(),
   chargePointModel: z.string().optional(),
   firmwareVersion: z.string().optional(),
-  connectorsPerChargePoint: z.number().int().positive().optional(),
+  connectors: z.array(z.number().int().positive()).min(1).optional(),
 });
 
 const createVcpSchema = z.object({
@@ -64,9 +64,7 @@ const toBootConfig = (
     overrides?.chargePointVendor ?? fallback.chargePointVendor,
   chargePointModel: overrides?.chargePointModel ?? fallback.chargePointModel,
   firmwareVersion: overrides?.firmwareVersion ?? fallback.firmwareVersion,
-  connectorsPerChargePoint:
-    overrides?.connectorsPerChargePoint ??
-    fallback.connectorsPerChargePoint,
+  connectors: overrides?.connectors ?? fallback.connectors,
 });
 
 const sanitizePassword = (value?: string | null): string | undefined =>

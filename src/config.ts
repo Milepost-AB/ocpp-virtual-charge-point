@@ -14,8 +14,7 @@ const BOOT_CONFIG_DEFAULTS = {
   chargePointVendor: "Solidstudio",
   chargePointModel: "VirtualChargePoint",
   firmwareVersion: "1.0.0",
-  connectorsPerChargePoint: 1,
-  connectors: undefined as number[] | undefined,
+  connectors: [1] as number[],
 } as const;
 
 const BootConfigSchema = z.object({
@@ -23,12 +22,10 @@ const BootConfigSchema = z.object({
   chargePointVendor: z.string().default(BOOT_CONFIG_DEFAULTS.chargePointVendor),
   chargePointModel: z.string().default(BOOT_CONFIG_DEFAULTS.chargePointModel),
   firmwareVersion: z.string().default(BOOT_CONFIG_DEFAULTS.firmwareVersion),
-  connectorsPerChargePoint: z
-    .number()
-    .int()
+  connectors: z
+    .array(z.number().int().positive())
     .min(1)
-    .default(BOOT_CONFIG_DEFAULTS.connectorsPerChargePoint),
-  connectors: z.array(z.number().int().positive()).optional(),
+    .default(BOOT_CONFIG_DEFAULTS.connectors),
 });
 
 const AdminConfigSchema = z.object({
@@ -123,6 +120,10 @@ const buildConfigFromEnv = (): RuntimeConfig => {
     process.env.CONNECTORS_PER_CP,
     1,
   );
+  const connectors = Array.from(
+    { length: connectorsPerChargePoint },
+    (_, i) => i + 1,
+  );
   const autoBootDisabled =
     process.env.AUTO_BOOT_DISABLED?.toLowerCase() === "true";
 
@@ -138,7 +139,7 @@ const buildConfigFromEnv = (): RuntimeConfig => {
         chargePointVendor,
         chargePointModel,
         firmwareVersion,
-        connectorsPerChargePoint,
+        connectors,
       },
     },
     vcps: cpIds.map((id, index) => ({
@@ -192,11 +193,7 @@ export const mergeBootConfig = (
       "VirtualChargePoint",
     firmwareVersion:
       specific?.firmwareVersion ?? defaults?.firmwareVersion ?? "1.0.0",
-    connectorsPerChargePoint:
-      specific?.connectorsPerChargePoint ??
-      defaults?.connectorsPerChargePoint ??
-      1,
-    connectors: specific?.connectors ?? defaults?.connectors,
+    connectors: specific?.connectors ?? defaults?.connectors ?? [1],
   };
 };
 

@@ -17,7 +17,7 @@
         "chargePointVendor": "Solidstudio",
         "chargePointModel": "VirtualChargePoint",
         "firmwareVersion": "1.0.0",
-        "connectorsPerChargePoint": 2
+        "connectors": [1, 2]
       },
       "metadata": {
         "site": "HQ",
@@ -26,4 +26,3 @@
     }
   ]
 }
-

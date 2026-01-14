@@ -132,3 +132,5 @@ dist
 
 .vscode
 .history
+
+config/vcps.json
