@@ -39,11 +39,14 @@ class RemoteStartTransactionOcppMessage extends OcppIncoming<
       return;
     }
     vcp.respond(this.response(call, { status: "Accepted" }));
+    const meterStart = Math.floor(
+      vcp.transactionManager.getConnectorMeterValue(connectorId),
+    );
     vcp.send(
       startTransactionOcppMessage.request({
         connectorId: call.payload.connectorId,
         idTag: call.payload.idTag,
-        meterStart: 0,
+        meterStart,
         timestamp: new Date().toISOString(),
       }),
     );

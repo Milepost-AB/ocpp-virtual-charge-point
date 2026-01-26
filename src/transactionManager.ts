@@ -8,6 +8,7 @@ interface TransactionState {
   startedAt: Date;
   idTag: string;
   transactionId: TransactionId;
+  meterStart: number;
   meterValue: number;
   evseId?: number;
   connectorId: number;
@@ -27,6 +28,7 @@ export class TransactionManager {
     TransactionState & { meterValuesTimer: NodeJS.Timeout }
   > = new Map();
   private pendingConnectors = new Set<number>();
+  private connectorMeterValues = new Map<number, number>();
 
   canStartNewTransaction(connectorId: number) {
     const hasActiveTransaction = Array.from(this.transactions.values()).some(
@@ -37,6 +39,9 @@ export class TransactionManager {
 
   startTransaction(vcp: VCP, startTransactionProps: StartTransactionProps) {
     this.releaseConnector(startTransactionProps.connectorId);
+    const meterStart = this.getConnectorMeterValue(
+      startTransactionProps.connectorId,
+    );
     const meterValuesTimer = setInterval(() => {
       // biome-ignore lint/style/noNonNullAssertion: transaction must exist
       const currentTransactionState = this.transactions.get(
@@ -52,7 +57,8 @@ export class TransactionManager {
     this.transactions.set(startTransactionProps.transactionId, {
       transactionId: startTransactionProps.transactionId,
       idTag: startTransactionProps.idTag,
-      meterValue: 0,
+      meterStart,
+      meterValue: meterStart,
       startedAt: new Date(),
       evseId: startTransactionProps.evseId,
       connectorId: startTransactionProps.connectorId,
@@ -62,8 +68,14 @@ export class TransactionManager {
 
   stopTransaction(transactionId: TransactionId) {
     const transaction = this.transactions.get(transactionId);
-    if (transaction?.meterValuesTimer) {
-      clearInterval(transaction.meterValuesTimer);
+    if (transaction) {
+      this.connectorMeterValues.set(
+        transaction.connectorId,
+        this.getTransactionMeterValue(transaction),
+      );
+      if (transaction.meterValuesTimer) {
+        clearInterval(transaction.meterValuesTimer);
+      }
     }
     this.transactions.delete(transactionId);
   }
@@ -91,6 +103,17 @@ export class TransactionManager {
     if (!transaction) {
       return 0;
     }
-    return (new Date().getTime() - transaction.startedAt.getTime()) / 100;
+    return this.getTransactionMeterValue(transaction);
+  }
+
+  getConnectorMeterValue(connectorId: number) {
+    return this.connectorMeterValues.get(connectorId) ?? 0;
+  }
+
+  private getTransactionMeterValue(transaction: TransactionState) {
+    return (
+      transaction.meterStart +
+      (new Date().getTime() - transaction.startedAt.getTime()) / 100
+    );
   }
 }

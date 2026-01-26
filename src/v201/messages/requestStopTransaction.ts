@@ -44,7 +44,7 @@ class RequestStopTransactionOcppIncoming extends OcppIncoming<
 
     const ocmf = generateOCMF({
       startTime: transaction.startedAt,
-      startEnergy: 0,
+      startEnergy: transaction.meterStart / 1000,
       endTime: new Date(),
       endEnergy: vcp.transactionManager.getMeterValue(transactionId) / 1000,
       idTag: transaction.idTag,

@@ -37,6 +37,8 @@ class RequestStartTransactionOcppIncoming extends OcppIncoming<
     const transactionId = uuid.v4();
     const transactionEvseId = call.payload.evseId ?? 1;
     const transactionConnectorId = 1;
+    const meterStart =
+      vcp.transactionManager.getConnectorMeterValue(transactionConnectorId);
     vcp.transactionManager.startTransaction(vcp, {
       transactionId: transactionId,
       idTag: call.payload.idToken.idToken,
@@ -107,7 +109,7 @@ class RequestStartTransactionOcppIncoming extends OcppIncoming<
             timestamp: new Date().toISOString(),
             sampledValue: [
               {
-                value: 0,
+                value: meterStart / 1000,
                 measurand: "Energy.Active.Import.Register",
                 unitOfMeasure: {
                   unit: "kWh",
