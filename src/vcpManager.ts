@@ -101,6 +101,7 @@ export class VcpManager {
       chargePointId: config.id,
       ocppVersion: config.ocppVersion,
       basicAuthPassword: config.basicAuthPassword,
+      outboundRequestTimeoutMs: config.outboundRequestTimeoutMs,
     });
 
     const record: ManagedVcpRecord = {

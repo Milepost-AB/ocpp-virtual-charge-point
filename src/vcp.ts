@@ -8,7 +8,7 @@ import {
   type OcppMessageHandler,
   resolveMessageHandler,
 } from "./ocppMessageHandler";
-import { ocppOutbox } from "./ocppOutbox";
+import { OcppOutbox } from "./ocppOutbox";
 import { type OcppVersion, toProtocolVersion } from "./ocppVersion";
 import {
   validateOcppIncomingRequest,
@@ -24,6 +24,7 @@ interface VCPOptions {
   endpoint: string;
   chargePointId: string;
   basicAuthPassword?: string;
+  outboundRequestTimeoutMs?: number;
 }
 
 interface LogEntry {
@@ -37,6 +38,13 @@ interface LogEntry {
 export class VCP extends EventEmitter {
   private ws?: WebSocket;
   private messageHandler: OcppMessageHandler;
+  private readonly outbox = new OcppOutbox();
+  // biome-ignore lint/suspicious/noExplicitAny: ocpp types
+  private outboundQueue: Array<OcppCall<any>> = [];
+  // biome-ignore lint/suspicious/noExplicitAny: ocpp types
+  private inFlight?: OcppCall<any>;
+  private inFlightTimeout?: NodeJS.Timeout;
+  private readonly outboundRequestTimeoutMs: number;
 
   private isFinishing = false;
   private heartbeatInterval?: NodeJS.Timeout;
@@ -47,6 +55,7 @@ export class VCP extends EventEmitter {
   constructor(private vcpOptions: VCPOptions) {
     super();
     this.messageHandler = resolveMessageHandler(vcpOptions.ocppVersion);
+    this.outboundRequestTimeoutMs = vcpOptions.outboundRequestTimeoutMs ?? 30000;
   }
 
   async connect(): Promise<void> {
@@ -108,20 +117,8 @@ export class VCP extends EventEmitter {
     if (!this.ws) {
       throw new Error("Websocket not initialized. Call connect() first");
     }
-    ocppOutbox.enqueue(ocppCall);
-    const jsonMessage = JSON.stringify([
-      2,
-      ocppCall.messageId,
-      ocppCall.action,
-      ocppCall.payload,
-    ]);
-    logger.info(`Sending message ➡️  ${jsonMessage}`);
-    validateOcppOutgoingRequest(
-      this.vcpOptions.ocppVersion,
-      ocppCall.action,
-      JSON.parse(JSON.stringify(ocppCall.payload)),
-    );
-    this.ws.send(jsonMessage);
+    this.outboundQueue.push(ocppCall);
+    this.dispatchNext();
   }
 
   // biome-ignore lint/suspicious/noExplicitAny: ocpp types
@@ -173,6 +170,7 @@ export class VCP extends EventEmitter {
     }
     this.isFinishing = true;
     this.clearHeartbeat();
+    this.clearInFlightTimeout();
     this.ws.close();
     this.ws = undefined;
   }
@@ -230,11 +228,10 @@ export class VCP extends EventEmitter {
       this.messageHandler.handleCall(this, { messageId, action, payload });
     } else if (type === 3) {
       const [messageId, payload] = rest;
-      const enqueuedCall = ocppOutbox.get(messageId);
+      const enqueuedCall = this.outbox.get(messageId);
       if (!enqueuedCall) {
-        throw new Error(
-          `Received CallResult for unknown messageId=${messageId}`,
-        );
+        logger.warn(`Received CallResult for unknown messageId=${messageId}`);
+        return;
       }
       validateOcppOutgoingResponse(
         this.vcpOptions.ocppVersion,
@@ -246,14 +243,21 @@ export class VCP extends EventEmitter {
         payload,
         action: enqueuedCall.action,
       });
+      this.completeInFlight(messageId);
     } else if (type === 4) {
       const [messageId, errorCode, errorDescription, errorDetails] = rest;
+      const enqueuedCall = this.outbox.get(messageId);
+      if (!enqueuedCall) {
+        logger.warn(`Received CallError for unknown messageId=${messageId}`);
+        return;
+      }
       this.messageHandler.handleCallError(this, {
         messageId,
         errorCode,
         errorDescription,
         errorDetails,
       });
+      this.completeInFlight(messageId);
     } else {
       throw new Error(`Unrecognized message type ${type}`);
     }
@@ -261,6 +265,7 @@ export class VCP extends EventEmitter {
 
   private _onClose(code: number, reason: string) {
     this.clearHeartbeat();
+    this.clearInFlightTimeout();
     this.ws = undefined;
     this.connectionPromise = undefined;
     if (this.isFinishing) {
@@ -276,5 +281,79 @@ export class VCP extends EventEmitter {
       clearInterval(this.heartbeatInterval);
       this.heartbeatInterval = undefined;
     }
+  }
+
+  private dispatchNext() {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      return;
+    }
+    if (this.inFlight) {
+      return;
+    }
+    const next = this.outboundQueue.shift();
+    if (!next) {
+      return;
+    }
+    this.sendNow(next);
+  }
+
+  // biome-ignore lint/suspicious/noExplicitAny: ocpp types
+  private sendNow(ocppCall: OcppCall<any>) {
+    if (!this.ws) {
+      throw new Error("Websocket not initialized. Call connect() first");
+    }
+    this.inFlight = ocppCall;
+    this.outbox.enqueue(ocppCall);
+    const jsonMessage = JSON.stringify([
+      2,
+      ocppCall.messageId,
+      ocppCall.action,
+      ocppCall.payload,
+    ]);
+    logger.info(`Sending message ➡️  ${jsonMessage}`);
+    validateOcppOutgoingRequest(
+      this.vcpOptions.ocppVersion,
+      ocppCall.action,
+      JSON.parse(JSON.stringify(ocppCall.payload)),
+    );
+    this.ws.send(jsonMessage);
+    this.startInFlightTimeout(ocppCall);
+  }
+
+  private startInFlightTimeout(
+    // biome-ignore lint/suspicious/noExplicitAny: ocpp types
+    ocppCall: OcppCall<any>,
+  ) {
+    this.clearInFlightTimeout();
+    if (this.outboundRequestTimeoutMs <= 0) {
+      return;
+    }
+    this.inFlightTimeout = setTimeout(() => {
+      if (this.inFlight?.messageId !== ocppCall.messageId) {
+        return;
+      }
+      logger.warn(
+        `OCPP call timed out | id=${this.vcpOptions.chargePointId} action=${ocppCall.action} messageId=${ocppCall.messageId} timeoutMs=${this.outboundRequestTimeoutMs}`,
+      );
+      this.inFlight = undefined;
+      this.outbox.remove(ocppCall.messageId);
+      this.dispatchNext();
+    }, this.outboundRequestTimeoutMs);
+  }
+
+  private clearInFlightTimeout() {
+    if (this.inFlightTimeout) {
+      clearTimeout(this.inFlightTimeout);
+      this.inFlightTimeout = undefined;
+    }
+  }
+
+  private completeInFlight(messageId: string) {
+    if (this.inFlight?.messageId !== messageId) {
+      return;
+    }
+    this.inFlight = undefined;
+    this.clearInFlightTimeout();
+    this.dispatchNext();
   }
 }

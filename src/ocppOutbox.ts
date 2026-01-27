@@ -1,6 +1,6 @@
 import type { OcppCall } from "./ocppMessage";
 
-class OcppOutbox {
+export class OcppOutbox {
   // biome-ignore lint/suspicious/noExplicitAny: ocpp types
   private queue: Map<string, OcppCall<any>> = new Map();
 
@@ -15,6 +15,8 @@ class OcppOutbox {
     this.queue.delete(messageId);
     return enqueuedCall;
   }
-}
 
-export const ocppOutbox = new OcppOutbox();
+  remove(messageId: string): void {
+    this.queue.delete(messageId);
+  }
+}
