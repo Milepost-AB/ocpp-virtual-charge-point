@@ -38,6 +38,7 @@ const RawVcpConfigSchema = z.object({
   endpoint: z.string().min(1).optional(),
   chargePointSerialNumber: z.string().min(1).optional(),
   basicAuthPassword: z.string().optional(),
+  outboundRequestTimeoutMs: z.number().int().positive().optional(),
   metadata: z.record(z.unknown()).optional(),
   autoBoot: BootConfigSchema.optional(),
 });
@@ -49,6 +50,7 @@ const RuntimeConfigSchema = z.object({
       endpoint: z.string().default("ws://localhost:8092"),
       basicAuthPassword: z.string().optional(),
       autoBoot: BootConfigSchema.optional(),
+      outboundRequestTimeoutMs: z.number().int().positive().default(30000),
     })
     .default({ endpoint: "ws://localhost:8092" }),
   vcps: z.array(RawVcpConfigSchema).min(1),
@@ -66,6 +68,7 @@ export interface ResolvedVcpConfig extends RawVcpConfig {
   metadata: Record<string, unknown>;
   autoBoot?: BootConfig;
   chargePointSerialNumber?: string;
+  outboundRequestTimeoutMs: number;
 }
 
 export interface ResolvedConfig {
@@ -141,6 +144,7 @@ const buildConfigFromEnv = (): RuntimeConfig => {
         firmwareVersion,
         connectors,
       },
+      outboundRequestTimeoutMs: 30000,
     },
     vcps: cpIds.map((id, index) => ({
       id,
@@ -212,6 +216,8 @@ const resolveVcpConfig = (
     chargePointSerialNumber:
       raw.chargePointSerialNumber ??
       `${raw.id}-S${String(index + 1).padStart(3, "0")}`,
+    outboundRequestTimeoutMs:
+      raw.outboundRequestTimeoutMs ?? defaults.outboundRequestTimeoutMs ?? 30000,
   };
 };
 

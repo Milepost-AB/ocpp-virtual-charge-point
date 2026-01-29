@@ -4,7 +4,8 @@
   },
   "defaults": {
     "endpoint": "ws://localhost:8092",
-    "basicAuthPassword": "secret"
+    "basicAuthPassword": "secret",
+    "outboundRequestTimeoutMs": 30000
   },
   "vcps": [
     {
